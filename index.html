@@ -136,6 +136,16 @@
             font-size: 0.95rem;
             padding: 12px;
             vertical-align: middle;
+            cursor: pointer;
+        }
+        .table th:hover {
+            background-color: #3c4b4c;
+        }
+        .table th.sort-asc::after {
+            content: ' ↑';
+        }
+        .table th.sort-desc::after {
+            content: ' ↓';
         }
         .table td {
             background-color: #2a3637;
@@ -325,7 +335,7 @@
                         <div class="col-md-3 mb-3">
                             <label for="endDate" class="form-label">End Date</label>
                             <input type="date" class="form-control" id="endDate" required>
-                            <div id="endDateError" class="error "></div>
+                            <div id="endDateError" class="error"></div>
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="fees" class="form-label">Fees</label>
@@ -501,6 +511,10 @@
 
         let trades = [];
         let yieldChart;
+        let sortConfig = {
+            column: 'symbol',
+            direction: 'asc'
+        };
 
         const formatCurrency = (value) => {
             return '$' + parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -880,31 +894,7 @@
                     stockGroups[trade.symbol].push(trade);
                 });
 
-                const tableContainer = document.createElement('div');
-                tableContainer.className = 'card';
-                tableContainer.innerHTML = `
-                    <div class="card-header">Per-Stock Metrics</div>
-                    <div class="card-body">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Total Fees</th>
-                                    <th>Average Monthly Fee</th>
-                                    <th>Total Premium (minus fees)</th>
-                                    <th>Monthly Premium</th>
-                                    <th>Average Yield</th>
-                                    <th>Total Contracts</th>
-                                </tr>
-                            </thead>
-                            <tbody id="perStockTableBody"></tbody>
-                        </table>
-                    </div>
-                `;
-                perStockMetricsEl.appendChild(tableContainer);
-
-                const tbody = document.getElementById('perStockTableBody');
-                Object.keys(stockGroups).sort().forEach(symbol => {
+                const stockData = Object.keys(stockGroups).map(symbol => {
                     const stockTrades = stockGroups[symbol];
                     const stockTotalFees = stockTrades.reduce((sum, trade) => sum + parseFloat(trade.fees), 0);
                     const stockTotalPremium = stockTrades.reduce((sum, trade) => sum + parseFloat(trade.totalPremiumFinal !== null ? trade.totalPremiumFinal : trade.totalPremiumInitial), 0);
@@ -916,19 +906,76 @@
                     const stockAvgMonthlyFee = stockTotalFees / stockMonths;
                     const stockEqMonthlyPremium = stockTotalPremium / stockMonths;
 
+                    return {
+                        symbol,
+                        stockTotalFees,
+                        stockAvgMonthlyFee,
+                        stockTotalPremium,
+                        stockEqMonthlyPremium,
+                        stockAvgYield,
+                        stockTotalContracts
+                    };
+                });
+
+                // Sort stockData based on sortConfig
+                stockData.sort((a, b) => {
+                    const column = sortConfig.column;
+                    const direction = sortConfig.direction === 'asc' ? 1 : -1;
+                    if (column === 'symbol') {
+                        return direction * a[column].localeCompare(b[column]);
+                    } else {
+                        return direction * (a[column] - b[column]);
+                    }
+                });
+
+                const tableContainer = document.createElement('div');
+                tableContainer.className = 'card';
+                tableContainer.innerHTML = `
+                    <div class="card-header">Per-Stock Metrics</div>
+                    <div class="card-body">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th onclick="sortTable('symbol')" class="${sortConfig.column === 'symbol' ? 'sort-' + sortConfig.direction : ''}">Symbol</th>
+                                    <th onclick="sortTable('stockTotalFees')" class="${sortConfig.column === 'stockTotalFees' ? 'sort-' + sortConfig.direction : ''}">Total Fees</th>
+                                    <th onclick="sortTable('stockAvgMonthlyFee')" class="${sortConfig.column === 'stockAvgMonthlyFee' ? 'sort-' + sortConfig.direction : ''}">Average Monthly Fee</th>
+                                    <th onclick="sortTable('stockTotalPremium')" class="${sortConfig.column === 'stockTotalPremium' ? 'sort-' + sortConfig.direction : ''}">Total Premium (minus fees)</th>
+                                    <th onclick="sortTable('stockEqMonthlyPremium')" class="${sortConfig.column === 'stockEqMonthlyPremium' ? 'sort-' + sortConfig.direction : ''}">Monthly Premium</th>
+                                    <th onclick="sortTable('stockAvgYield')" class="${sortConfig.column === 'stockAvgYield' ? 'sort-' + sortConfig.direction : ''}">Average Yield</th>
+                                    <th onclick="sortTable('stockTotalContracts')" class="${sortConfig.column === 'stockTotalContracts' ? 'sort-' + sortConfig.direction : ''}">Total Contracts</th>
+                                </tr>
+                            </thead>
+                            <tbody id="perStockTableBody"></tbody>
+                        </table>
+                    </div>
+                `;
+                perStockMetricsEl.appendChild(tableContainer);
+
+                const tbody = document.getElementById('perStockTableBody');
+                stockData.forEach(data => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${symbol}</td>
-                        <td class="metric-value">${formatCurrency(stockTotalFees)}</td>
-                        <td class="metric-value">${formatCurrency(stockAvgMonthlyFee)}</td>
-                        <td class="metric-value">${formatCurrency(stockTotalPremium)}</td>
-                        <td class="metric-value">${formatCurrency(stockEqMonthlyPremium)}</td>
-                        <td class="metric-value">${formatPercentage(stockAvgYield)}</td>
-                        <td class="metric-value">${stockTotalContracts.toLocaleString('en-US')}</td>
+                        <td>${data.symbol}</td>
+                        <td class="metric-value">${formatCurrency(data.stockTotalFees)}</td>
+                        <td class="metric-value">${formatCurrency(data.stockAvgMonthlyFee)}</td>
+                        <td class="metric-value">${formatCurrency(data.stockTotalPremium)}</td>
+                        <td class="metric-value">${formatCurrency(data.stockEqMonthlyPremium)}</td>
+                        <td class="metric-value">${formatPercentage(data.stockAvgYield)}</td>
+                        <td class="metric-value">${data.stockTotalContracts.toLocaleString('en-US')}</td>
                     `;
                     tbody.appendChild(row);
                 });
             }
+        }
+
+        function sortTable(column) {
+            if (sortConfig.column === column) {
+                sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortConfig.column = column;
+                sortConfig.direction = 'asc';
+            }
+            updateDashboard();
         }
 
         function renderTrades() {
@@ -1145,7 +1192,7 @@
             }
             if (trade['Total Premium Final'] !== undefined && trade['Total Premium Final'] !== '' && trade['Total Premium Final'] !== null) {
                 const totalPremiumFinal = parseFloat(trade['Total Premium Final']);
-                const totalPremiumInitial = trade.Contracts && trade.Premium && trade.Fees ? (trade.Contracts * premium * 100) - trade.Fees : null;
+                const totalPremiumInitial = trade.Contracts && trade.Premium && trade.Fees ? (trade.Contracts * trade.Premium * 100) - trade.Fees : null;
                 if (isNaN(totalPremiumFinal)) {
                     errors.push(`Invalid Total Premium Final: ${trade['Total Premium Final']}`);
                 } else if (totalPremiumInitial) {
