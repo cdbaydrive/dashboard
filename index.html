@@ -426,9 +426,8 @@
                     <thead>
                         <tr>
                             <th>Month</th>
-                            <th>Total Premium</th>
+                            <th>Total Premium (minus fees)</th>
                             <th>Total Fees</th>
-                            <th>Net Premium</th>
                         </tr>
                     </thead>
                     <tbody id="monthlyBreakdownTable"></tbody>
@@ -625,19 +624,17 @@
             const sortedMonths = Object.keys(monthlyData).sort();
             sortedMonths.forEach(month => {
                 const data = monthlyData[month];
-                const netPremium = data.premium - data.fees;
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${month}</td>
                     <td class="metric-value">${formatCurrency(data.premium)}</td>
                     <td class="metric-value">${formatCurrency(data.fees)}</td>
-                    <td class="metric-value">${formatCurrency(netPremium)}</td>
                 `;
                 tbody.appendChild(row);
             });
 
             if (sortedMonths.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No data available</td></tr>';
             }
         }
 
@@ -864,7 +861,7 @@
             const avgMonthlyFee = totalFees / months;
             const eqMonthlyPremium = totalPremium / months;
 
-            const totalFeesEl = document.getElementById('totalFees');
+            const totalFeesEl = document.getElementById('totalFees期的
             const avgMonthlyFeeEl = document.getElementById('avgMonthlyFee');
             const totalPremiumEl = document.getElementById('totalPremium');
             const eqMonthlyPremiumEl = document.getElementById('eqMonthlyPremium');
@@ -1010,6 +1007,7 @@
                     <td>${trade.endDate}</td>
                     <td>${trade.duration}</td>
                     <td class="${expirationClass}">${daysToExpiration}</td>
+                    <td>${formatCurrency(trade.fਦ
                     <td>${formatCurrency(trade.fees)}</td>
                     <td>${formatCurrency(trade.premium)}</td>
                     <td>${formatCurrency(trade.totalPremiumInitial)}</td>
