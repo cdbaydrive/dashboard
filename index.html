@@ -215,7 +215,6 @@
             .table th, .table td {
                 padding: 8px;
             }
-            /* Ensure upload section is fully accessible on mobile */
             .upload-section {
                 flex-wrap: wrap;
                 gap: 8px;
@@ -240,7 +239,7 @@
             border-radius: 5px;
             padding: 8px 16px;
             transition: background-color 0.2s;
-            touch-action: manipulation; /* Prevent double-tap zoom on mobile */
+            touch-action: manipulation;
         }
         .btn-custom:hover {
             background-color: #d88f1f;
@@ -288,7 +287,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-weight: 500;
-            touch-action: manipulation; /* Prevent double-tap zoom on mobile */
+            touch-action: manipulation;
         }
         .upload-section label:hover {
             background-color: #d88f1f;
@@ -309,6 +308,33 @@
             align-items: center;
             justify-content: center;
             height: 100%;
+        }
+        .nav-tabs {
+            border-bottom: none;
+        }
+        .nav-tabs .nav-link {
+            background-color: #2a3637;
+            color: #d3d7d8;
+            border: 1px solid #4a5a5b;
+            border-radius: 5px;
+            margin-right: 5px;
+            padding: 6px 12px;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .nav-tabs .nav-link:hover {
+            background-color: #3c4b4c;
+            border-color: #f5a623;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #f5a623;
+            color: #ffffff;
+            border-color: #f5a623;
+        }
+        .year-tabs-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
     </style>
 </head>
@@ -424,9 +450,8 @@
         </div>
 
         <div class="card">
-            <div class="card-header">
-                Total Premium Over Time
-                <button class="btn btn-custom btn-sm" onclick="refreshDashboard()">Refresh Chart</button>
+            <div class="card-header">Total Premium Over Time
+                <button class="btn btn-custom btn-sm" onclick="refreshChart()">Refresh Chart</button>
             </div>
             <div class="card-body">
                 <div class="chart-container">
@@ -453,8 +478,13 @@
 
         <div class="card">
             <div class="card-header">
-                Trade History
-                <button class="btn btn-custom btn-sm" onclick="exportToExcel()">Export to Excel</button>
+                <div class="year-tabs-container">
+                    <div class="year-tabs">
+                        <ul class="nav nav-tabs" id="yearTabs"></ul>
+                    </div>
+                    Trade History
+                    <button class="btn btn-custom btn-sm" onclick="exportToExcel()">Export to Excel</button>
+                </div>
             </div>
             <div class="card-body">
                 <table class="table table-striped">
@@ -530,6 +560,7 @@
             column: 'symbol',
             direction: 'asc'
         };
+        let selectedYear = new Date().getFullYear().toString(); // Default to current year
 
         const formatCurrency = (value) => {
             return '$' + parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -618,6 +649,35 @@
             const diff = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
             return diff > 0 ? diff : '';
         };
+
+        function updateYearTabs() {
+            const yearTabs = document.getElementById('yearTabs');
+            if (!yearTabs) return;
+
+            // Get unique years from trades
+            const years = [...new Set(trades.map(trade => new Date(trade.startDate).getFullYear()))].sort((a, b) => b - a);
+            yearTabs.innerHTML = '';
+
+            // Add "All" tab
+            const allTab = document.createElement('li');
+            allTab.className = 'nav-item';
+            allTab.innerHTML = `<a class="nav-link ${selectedYear === 'All' ? 'active' : ''}" href="javascript:void(0);" onclick="selectYear('All')">All</a>`;
+            yearTabs.appendChild(allTab);
+
+            // Add year tabs
+            years.forEach(year => {
+                const tab = document.createElement('li');
+                tab.className = 'nav-item';
+                tab.innerHTML = `<a class="nav-link ${selectedYear === year.toString() ? 'active' : ''}" href="javascript:void(0);" onclick="selectYear('${year}')">${year}</a>`;
+                yearTabs.appendChild(tab);
+            });
+        }
+
+        function selectYear(year) {
+            selectedYear = year;
+            updateYearTabs();
+            renderTradeTable();
+        }
 
         function updateMonthlyBreakdown() {
             const tbody = document.getElementById('monthlyBreakdownTable');
@@ -770,7 +830,8 @@
                             backgroundColor: '#f5a623',
                             fill: false,
                             tension: 0.1,
-                            yAxisID: 'y'
+                            yAxisID: 'y',
+                            borderWidth: 1
                         },
                         {
                             label: 'Cumulative Premium ($)',
@@ -779,7 +840,8 @@
                             backgroundColor: '#4a90e2',
                             fill: false,
                             tension: 0.1,
-                            yAxisID: 'y1'
+                            yAxisID: 'y1',
+                            borderWidth: 1
                         },
                         {
                             label: 'Average Monthly Premium ($)',
@@ -788,7 +850,8 @@
                             borderDash: [5, 5],
                             fill: false,
                             tension: 0,
-                            yAxisID: 'y'
+                            yAxisID: 'y',
+                            borderWidth: 1
                         }
                     ]
                 },
@@ -843,20 +906,8 @@
             return true;
         }
 
-        function refreshDashboard() {
-            console.log('Refreshing dashboard...');
-            const storedTrades = localStorage.getItem('trades');
-            if (storedTrades) {
-                try {
-                    trades = JSON.parse(storedTrades) || [];
-                } catch (e) {
-                    console.error('Error parsing stored trades:', e);
-                    trades = [];
-                }
-            } else {
-                trades = [];
-            }
-            renderTrades();
+        function refreshChart() {
+            console.log('Refreshing chart...');
             setTimeout(() => {
                 const success = updateChart();
                 if (!success) {
@@ -990,7 +1041,7 @@
             updateDashboard();
         }
 
-        function renderTrades() {
+        function renderTradeTable() {
             const tbody = document.getElementById('tradeTableBody');
             if (!tbody) {
                 console.error('tradeTableBody element not found.');
@@ -998,7 +1049,9 @@
             }
             tbody.innerHTML = '';
             const today = new Date();
-            trades.forEach((trade, index) => {
+            const filteredTrades = selectedYear === 'All' ? trades : trades.filter(trade => new Date(trade.startDate).getFullYear().toString() === selectedYear);
+            filteredTrades.forEach((trade, index) => {
+                const globalIndex = trades.indexOf(trade);
                 const endDate = new Date(trade.endDate);
                 if (!trade.hasManualTotalPremiumFinal && today > endDate && trade.totalPremiumFinal === null) {
                     trade.totalPremiumFinal = trade.totalPremiumInitial;
@@ -1012,7 +1065,7 @@
                 const expirationClass = daysToExpiration !== '' ? 'highlight-expiration' : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><span class="delete-btn" onclick="deleteTrade(${index})">x</span></td>
+                    <td><span class="delete-btn" onclick="deleteTrade(${globalIndex})">x</span></td>
                     <td>${index + 1}</td>
                     <td>${trade.symbol}</td>
                     <td>${trade.contractType}</td>
@@ -1025,19 +1078,34 @@
                     <td>${formatCurrency(trade.fees)}</td>
                     <td>${formatCurrency(trade.premium)}</td>
                     <td>${formatCurrency(trade.totalPremiumInitial)}</td>
-                    <td><input type="number" class="${inputClass}" step="0.01" min="0" value="${totalPremiumFinalValue}" onchange="updateTotalPremiumFinal(${index}, this.value)" placeholder="-"></td>
+                    <td><input type="number" class="${inputClass}" step="0.01" min="0" value="${totalPremiumFinalValue}" onchange="updateTotalPremiumFinal(${globalIndex}, this.value)" placeholder="-"></td>
                     <td>${formatPercentage(trade.yield)}</td>
                 `;
                 tbody.appendChild(row);
             });
-            console.log('Rendered trades:', trades.length);
-            localStorage.setItem('trades', JSON.stringify(trades));
+            console.log('Rendered trades:', filteredTrades.length);
+            updateYearTabs();
+        }
+
+        function renderTrades() {
+            const storedTrades = localStorage.getItem('trades');
+            if (storedTrades) {
+                try {
+                    trades = JSON.parse(storedTrades) || [];
+                } catch (e) {
+                    console.error('Error parsing stored trades:', e);
+                    trades = [];
+                }
+            } else {
+                trades = [];
+            }
+            renderTradeTable();
             updateDashboard();
             updateMonthlyBreakdown();
             setTimeout(() => {
                 const success = updateChart();
                 if (!success) {
-                    console.warn('Chart update failed in renderTrades, retrying...');
+                    console.warn('Chart update failed, retrying...');
                     setTimeout(updateChart, 500);
                 }
             }, 100);
@@ -1487,7 +1555,6 @@
                 return;
             }
 
-            // Handle file selection for both desktop and mobile
             uploadFileEl.addEventListener('change', (e) => {
                 console.log('File input change event triggered. Files:', e.target.files.length);
                 const file = e.target.files[0];
@@ -1504,7 +1571,6 @@
                 }
             });
 
-            // Ensure process button works on both click and touch
             const handleProcess = () => {
                 console.log('Process button activated.');
                 if (uploadFileEl.files.length > 0) {
@@ -1520,17 +1586,15 @@
             };
             processFileEl.addEventListener('click', handleProcess);
             processFileEl.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // Prevent double-tap or scrolling issues
+                e.preventDefault();
                 console.log('Process button touchstart event.');
                 handleProcess();
             });
 
-            // Ensure label triggers file input on mobile
             const uploadLabel = document.querySelector('label[for="uploadFile"]');
             if (uploadLabel) {
                 uploadLabel.addEventListener('touchstart', (e) => {
                     console.log('Upload label touchstart event.');
-                    // Ensure the file input is triggered
                     uploadFileEl.click();
                 }, { passive: true });
             }
